@@ -1,0 +1,19 @@
+				Qt designer
+
+1) Se rendre à la racine du projet:
+C:\Users\DEV\Desktop\Samuel\AcquisitionPlutoSDR\GUI
+
+2) Rentrer la commande suivante pour compiler le fichier xml en python
+pyuic5 ./GUI.ui -o GUI.py
+
+4) Créer/ouvrir un fichier myGUI.py et faire les importations
+from PyQt6 import QtWidgets
+from GUI import Ui_MainWindow
+
+5) myGUI doit hériter de QmainWindow et de Ui_GUI:
+class myGUI(QtWidgets.QMainWindow, Ui_GUI)
+	def __init__(self):
+		super(myGUI,self).__init__()
+		self.setupUi(self)
+
+lien: https://www.youtube.com/watch?v=NSKtGMHwfsk
