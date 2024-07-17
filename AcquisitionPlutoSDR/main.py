@@ -5,7 +5,7 @@ from PyQt5.QtCore import QTimer
 from PyQt5 import QtWidgets
 from GUI.GUI import Ui_MainWindow
 from GUI.Chronometer import ChronometerThread
-from dsp import MonopulseAngleEstimator
+from dsp.dsp import MonopulseAngleEstimatorThread
 from GraphicalDOA import GraphicalDOA
 from PlutoSetup import CustomSDR
 from acquisition import AcquisitionThread
@@ -158,8 +158,8 @@ class MyGUI(QtWidgets.QMainWindow, Ui_MainWindow):
             self.data['Rx1'] = rx1
             self.Rx0analyzer.compute_fft(rx0)
             self.Rx1analyzer.compute_fft(rx1)
-            if hasattr(self, 'MonopulseAngleEstimator'):
-                self.MonopulseAngleEstimator.set_new_data(rx0, rx1)
+            if hasattr(self, 'MonopulseAngleEstimatorThread'):
+                self.MonopulseAngleEstimatorThread.set_new_data(rx0, rx1)
 
                 # print("estimation angle: ", self.MonopulseAngleEstimator.last_phase_delay)
             # print("Data received:")
@@ -247,9 +247,9 @@ class MyGUI(QtWidgets.QMainWindow, Ui_MainWindow):
         if hasattr(self, 'acquisition_thread'):
             self.log("Calibration déphasage en cours ...", color='green')
 
-            self.MonopulseAngleEstimator = MonopulseAngleEstimator()
-            self.MonopulseAngleEstimator.AoA_ready.connect(self.on_AoA_ready)
-            self.MonopulseAngleEstimator.start()
+            self.MonopulseAngleEstimatorThread = MonopulseAngleEstimatorThread()
+            self.MonopulseAngleEstimatorThread.AoA_ready.connect(self.on_AoA_ready)
+            self.MonopulseAngleEstimatorThread.start()
 
 ########################################################################################################################
 
@@ -446,34 +446,34 @@ class MyGUI(QtWidgets.QMainWindow, Ui_MainWindow):
     def on_AoA_ready(self, angle):
 
         # Lorsque le thread DSP (Digital Signal Processing) transmet une nouvelle estimation du déphasage
-        if hasattr(self, 'MonopulseAngleEstimator'):
+        if hasattr(self, 'MonopulseAngleEstimatorThread'):
 
             # Récupérer plutôt la moyenne que le déphasage courant
-            if self.AveragingEnabled and self.MonopulseAngleEstimator.get_average() is not None:
-                angle = self.MonopulseAngleEstimator.get_average()
+            if self.AveragingEnabled and self.MonopulseAngleEstimatorThread.estimator.get_average() is not None:
+                angle = self.MonopulseAngleEstimatorThread.estimator.get_average()
 
             self.GraphicalDOA.updateDATA(angle)
             self.GraphicalDOA.p1.setTitle(str(round(angle, 3)) + " °")
-            self.PhaseCalibration_output.setText(str(self.MonopulseAngleEstimator.phase_cal) + " °")
+            self.PhaseCalibration_output.setText(str(self.MonopulseAngleEstimatorThread.estimator.phase_cal) + " °")
 
     def on_phase_calibrationButton_click(self):
-        if hasattr(self, 'MonopulseAngleEstimator'):
+        if hasattr(self, 'MonopulseAngleEstimatorThread'):
 
             # Émettre le signal pour réinitialiser la calibration
-            self.MonopulseAngleEstimator.reset_calibration_signal.emit()
+            self.MonopulseAngleEstimatorThread.reset_calibration_signal.emit()
 
     def onPhaseStep_click(self):
-        if hasattr(self, 'MonopulseAngleEstimator'):
+        if hasattr(self, 'MonopulseAngleEstimatorThread'):
 
-            self.MonopulseAngleEstimator.update_parameters(step_deg=float(self.step_phase_input.text()))
+            self.MonopulseAngleEstimatorThread.update_parameters(step_deg=float(self.step_phase_input.text()))
 
     def onFcarrier_click(self):
-        if hasattr(self, 'MonopulseAngleEstimator'):
+        if hasattr(self, 'MonopulseAngleEstimatorThread'):
 
-            self.MonopulseAngleEstimator.update_parameters(F0=float(self.Fcarrier_input.text()))
+            self.MonopulseAngleEstimatorThread.update_parameters(F0=float(self.Fcarrier_input.text()))
     def onAveraging(self):
 
-        if hasattr(self, 'MonopulseAngleEstimator'):
+        if hasattr(self, 'MonopulseAngleEstimatorThread'):
 
             # Si l'utilisateur sélectionne "ON" pour l'activation du moyennage
             if self.Averaging_input.currentText() == "ON":
@@ -484,7 +484,7 @@ class MyGUI(QtWidgets.QMainWindow, Ui_MainWindow):
                 self.AveragingEnabled = False
 
     def on_WindowSize_changed(self, value):
-        self.MonopulseAngleEstimator.window_size = value
+        self.MonopulseAngleEstimatorThread.update_parameters(window_size=value)
 
     """Méthode pour afficher un message dans le log"""
     def log(self, message, color='black'):
