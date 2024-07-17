@@ -1,16 +1,9 @@
 import numpy as np
-from PyQt5.QtCore import QThread, pyqtSignal
 
-
-class MonopulseAngleEstimator(QThread):
+class MonopulseAngleEstimator:
     """Classe pour estimer l'angle de direction d'un signal reçu par un réseau d'antennes."""
 
-    AoA_ready = pyqtSignal(object)  # Signal pour envoyer les résultats
-    reset_calibration_signal = pyqtSignal()
-
     def __init__(self, step_deg=0.1, window_size=1, f0=2227e6, d_wavelength=0.5):
-
-        super().__init__()
 
         # Valeurs actuelles des signaux reçus
         self.Rx_0 = None
@@ -34,15 +27,10 @@ class MonopulseAngleEstimator(QThread):
         self.phase_cal = 0
         self.last_phase_delay = 0  # Dernier déphasage utilisé pour le suivi
         self.step_deg = step_deg  # Pas de déphasage pour la recherche de l'angle de direction
-        # self.step_deg_cal = 0.1  # Pas de déphasage pour la calibration de phase
         self.step_deg_cal = 1  # Pas de déphasage pour la calibration de phase
 
         """ Variables d'état """
         self.calibrated = False  # Indique si la calibration de phase a été effectuée
-        # self.new_data = False  # Indique si de nouveaux signaux sont disponibles
-
-        # Connexion des signaux aux méthodes évenementiels
-        self.reset_calibration_signal.connect(self.reset_calibration)
 
     def update_parameters(self, step_deg=None, window_size=None, f0=None):
         """ Met à jour les paramètres de la classe. """
@@ -267,9 +255,6 @@ class MonopulseAngleEstimator(QThread):
         distinct_table = [[key, value] for key, value in value_counts.items()]
         return distinct_table
 
-    ########################################################################################################################
-    ################################################# Thread ###############################################################
-    ########################################################################################################################
     def reset_calibration(self):
         """Méthode pour réinitialiser la calibration."""
         self.calibrated = False
@@ -279,23 +264,55 @@ class MonopulseAngleEstimator(QThread):
         self.Rx_0 = Rx_0
         self.Rx_1 = Rx_1
 
+
+########################################################################################################################
+################################################# Class Thread #########################################################
+########################################################################################################################
+from PyQt5.QtCore import QThread, pyqtSignal
+
+
+class MonopulseAngleEstimatorThread(QThread):
+    """Classe pour exécuter l'estimation de l'angle de direction dans un thread séparé."""
+
+    AoA_ready = pyqtSignal(object)  # Signal pour envoyer les résultats
+    reset_calibration_signal = pyqtSignal()
+
+    def __init__(self, step_deg=0.1, window_size=1, f0=2227e6, d_wavelength=0.5):
+
+        super().__init__()
+
+        self.estimator = MonopulseAngleEstimator(step_deg, window_size, f0, d_wavelength)
+        self.reset_calibration_signal.connect(self.estimator.reset_calibration)
+
     def run(self):
         """Fonction principale du thread pour l'estimation de l'angle de direction."""
+
         print("tata")
+
         while True:
             # Si les deux signaux reçus sont disponibles
-            if self.Rx_0 is not None and self.Rx_1 is not None:
+            if self.estimator.Rx_0 is not None and self.estimator.Rx_1 is not None:
 
                 # Si la calibration de phase n'a pas encore été effectuée
-                if not self.calibrated:
-                    self.phase_cal = 0
-                    self.Autocal()
+                if not self.estimator.calibrated:
+                    self.estimator.phase_cal = 0
+                    self.estimator.Autocal()
 
                 # Suivre l'angle de direction
-                self.tracking()
+                self.estimator.tracking()
 
                 # Envoyer le déphasage via le signal
-                self.AoA_ready.emit(self.last_phase_delay)
+                self.AoA_ready.emit(self.estimator.last_phase_delay)
 
                 # Conserver le dernier déphasage dans la fenêtre mobile
-                self.add_sample(self.last_phase_delay)
+                self.estimator.add_sample(self.estimator.last_phase_delay)
+
+    def update_parameters(self, step_deg=None, window_size=None, f0=None):
+        self.estimator.update_parameters(step_deg, window_size, f0)
+
+    def set_new_data(self, Rx_0, Rx_1):
+        self.estimator.set_new_data(Rx_0, Rx_1)
+
+
+
+
